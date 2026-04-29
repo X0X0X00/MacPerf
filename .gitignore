@@ -19,6 +19,13 @@ src-tauri/gen/
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+*.db
+*.db-shm
+*.db-wal
+
+# Build artefacts at repo root (release dmgs / zips)
+MacPerf_*.dmg
+MacPerf_*.zip
 
 # Editor
 .vscode/*

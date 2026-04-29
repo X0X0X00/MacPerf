@@ -1,137 +1,143 @@
 <div align="center">
+  <img src="assets/icon-1024.png" alt="MacPerf" width="120" height="120"/>
 
-<img src="src-tauri/icons/128x128@2x.png" alt="MacPerf" width="120" height="120"/>
+  <h1>MacPerf</h1>
 
-# MacPerf
+  <p><strong>Make sense of your iStatistica Pro CSVs.</strong></p>
+  <p>Watch a folder, auto-import every CSV, visualize 4 metric panels, surface anomalies, compare sessions side-by-side — <em>100% local, zero network calls.</em></p>
 
-**让 iStatistica Pro 的 CSV 真正能看。**
+  <p>
+    <a href="https://github.com/X0X0X00/MacPerf/stargazers"><img src="https://img.shields.io/github/stars/X0X0X00/MacPerf?style=flat-square&logo=github&color=f59e0b&labelColor=0b1220" alt="Stars"/></a>
+    <a href="https://github.com/X0X0X00/MacPerf/releases"><img src="https://img.shields.io/github/v/tag/X0X0X00/MacPerf?sort=semver&style=flat-square&label=release&color=10b981&labelColor=0b1220" alt="Release"/></a>
+    <a href="LICENSE"><img src="https://img.shields.io/github/license/X0X0X00/MacPerf?style=flat-square&color=06b6d4&labelColor=0b1220" alt="License"/></a>
+    <a href="https://github.com/X0X0X00/MacPerf/commits/main"><img src="https://img.shields.io/github/commit-activity/m/X0X0X00/MacPerf?style=flat-square&color=8b5cf6&label=commits&labelColor=0b1220" alt="Commits"/></a>
+    <a href="https://tauri.app"><img src="https://img.shields.io/badge/built_with-Tauri_2-24c8db?style=flat-square&logo=tauri&logoColor=white&labelColor=0b1220" alt="Built with Tauri"/></a>
+  </p>
 
-监视一个文件夹 → 自动入库 → 时间序列可视化 + 阈值事件检测 + 跨记录对比。
-
-100% 本地，零网络请求。
-
+  <p>
+    English · <a href="README_zh-CN.md">简体中文</a>
+  </p>
 </div>
 
 ---
 
-## 它是干什么的
+## Why
 
-iStatistica Pro 能把系统状态导出成 CSV，但拿到一份几兆的 UTF-16 表格你也读不出什么东西来。
+iStatistica Pro logs your Mac's CPU, GPU, memory, temperature and fan speed into CSV. The CSV is fine — until you want to actually look at it. Several megabytes of UTF-16 with a per-line BOM is not a thing humans read.
 
-MacPerf 把这堆 CSV 变成你真正会看的东西 —— 顺带回答你心里真正在想的问题：*这台 Mac 啥时候过热的？哪段时间 CPU 一直跑满？昨天 vs 今天哪个更费电？*
+MacPerf turns that pile of CSVs into something you can use, and answers what you actually want to know: *when did this Mac throttle? Was it hotter rendering yesterday's video than today's? How long does it actually spend pinned at 100% CPU?*
 
-## 功能
+## Features
 
-- **🪂 自动监视** — 设置一个文件夹，iStatistica Pro 一导出新 CSV 就自动入库（FSEvents + `notify` crate）
-- **📊 4 个图表面板** — CPU / 内存 / GPU / 温度&风扇，时间轴同步、hover 游标联动
-- **🔍 自动洞察** — 持续高 CPU/GPU/内存压力、过热区间、风扇峰值，全部自动检测
-- **🎯 配置阈值** — 80% 太宽？改成 70% 持续 30 秒，一键重新分析所有历史记录
-- **🆚 跨记录对比** — 多选 2–6 条，叠加图按经过时间对齐 + 指标差值表（A vs B）
-- **🏷 自动标签** — "重 CPU"、"过热"、"空闲"，扫一眼记录列表就知道每条记录大概是什么
-- **📈 全局摘要** — 历史峰值温度/CPU/风扇（点一下跳到对应记录）+ 时段分布直方图
-- **⚡ 迷你 sparkline** — Library 列表里每条记录右边一条微缩 CPU+温度曲线
-- **🔒 隐私优先** — 所有处理都在本地，不发任何网络请求
+- **🪂 Auto-watch** — Point it at a folder. Anything iStatistica Pro writes there is parsed and imported automatically (FSEvents via `notify-debouncer-mini`). New session, new toast, no clicks.
+- **📊 4 chart panels** — CPU, Memory, GPU, Thermal & Fan. Synced hover cursor across all four (`syncId`), brush zoom on the CPU panel.
+- **🔍 Auto insights** — Sustained high CPU/GPU/memory pressure runs, overheating intervals, fan peak. Click an event in the side panel and the matching panel scrolls into view with the time range highlighted.
+- **🎯 Configurable thresholds** — Don't like 80% / 60s? Set 70% / 30s and click "reanalyze all" — every historical session gets re-evaluated.
+- **🆚 Cross-session compare** — Pick 2–6 sessions. Get an overlay chart aligned by elapsed time and a metrics table with a B−A delta column (when exactly two are picked).
+- **🏷 Auto pattern tags** — Each session gets tagged automatically: *heavy CPU*, *heavy GPU*, *overheating*, *stable*, *idle*. One glance at the library list and you know what each session was.
+- **📈 Global overview** — All-time peak temp / CPU / fan with a one-click jump to the session, plus hour-of-day and weekday histograms across your whole archive.
+- **⚡ Sparkline previews** — Every row in the library has a tiny CPU + temperature curve.
+- **🔒 Privacy** — Zero network requests. Everything is on your machine.
 
-## 快速开始
+## Quick start
 
-### 安装
+### Install (macOS, Apple Silicon)
 
-从 [Releases](https://github.com/X0X0X00/MacPerf/releases) 下载最新的 `MacPerf_*.dmg`，把 MacPerf 拖到 Applications。
+1. Download `MacPerf_<version>_aarch64.dmg` from [Releases](https://github.com/X0X0X00/MacPerf/releases) (or use the copy in this repo's root).
+2. Open the DMG → drag **MacPerf** into Applications.
+3. **First launch**: the app is unsigned. Right-click `MacPerf.app` → **Open** → confirm in the dialog.
 
-**首次启动**：app 没签名，右键 `MacPerf.app` → **打开** → 在系统弹窗里再确认一次。之后正常双击即可。
+See [docs/install.md](docs/install.md) for "app is damaged" workarounds.
 
-### 配置
+### Configure
 
-1. 在 iStatistica Pro 的 Preferences → Logger 里把 CSV export 指向某个文件夹（比如 `~/Documents/iStatistica/`）
-2. 打开 MacPerf，点右上角 ⚙️ → 选同一个文件夹
-3. 完事，已有 CSV 会立即扫描入库，新 CSV 落盘后会自动检测
+1. In iStatistica Pro: Preferences → Logger → set CSV export to a folder (e.g. `~/Documents/iStatistica/`).
+2. Open MacPerf → ⚙️ Settings → pick the same folder.
+3. That's it. Existing CSVs get scanned immediately, new ones get auto-imported as iStatistica writes them.
 
-## 键盘快捷键
+## Keyboard shortcuts
 
-| 快捷键 | 操作 |
+| Key | Action |
 |---|---|
-| ⌘, | 打开/关闭设置 |
-| ⌘F | 聚焦搜索框 |
-| ⌘K | 折叠/展开顶部摘要栏 |
-| ⌘+点击 | 多选记录（选 2 条进对比模式） |
-| 右键单击 | 删除该条记录 |
+| ⌘, | Open / close Settings |
+| ⌘F | Focus search box |
+| ⌘K | Toggle the top overview bar |
+| ⌘ + click | Multi-select (pick 2 to enter compare mode) |
+| Right-click row | Delete that session |
 
-## 开发
+## Privacy
 
-需要 Rust stable + Node 20+ + Xcode CLT（macOS）。
+MacPerf makes **zero network requests**. Period.
+
+- CSV parsing is local.
+- All data lives in `~/Library/Application Support/com.zzh.macperf/macperf.sqlite`.
+- No telemetry, no analytics, no auto-update phone-home.
+- Open source — audit the code or build from source to verify.
+
+## Develop
+
+Requires Node 20+, Rust stable, and Xcode CLT on macOS.
 
 ```sh
 git clone git@github.com:X0X0X00/MacPerf.git
 cd MacPerf
 npm install
-npm run tauri dev      # 开发模式（热重载）
-npm run tauri build    # 打 release，产物在 src-tauri/target/release/bundle/
+npm run tauri dev      # dev with hot reload
+npm run tauri build    # release bundle → src-tauri/target/release/bundle/dmg/
 ```
 
-### 项目结构
+### Project layout
 
 ```
-macperf/
-├── src/                       # React 前端
-│   ├── App.tsx                # 主布局 + 顶栏 + 摘要 + 快捷键
+MacPerf/
+├── src/                       # React frontend
+│   ├── App.tsx                # Top bar + overview + sidebar layout, shortcuts
 │   ├── views/
-│   │   ├── Library.tsx        # 记录列表（搜索/排序/sparkline/标签）
-│   │   ├── SessionDetail.tsx  # 单条详情（4 chart + insights）
-│   │   ├── Compare.tsx        # 多条对比（叠加图 + diff 表）
-│   │   └── Settings.tsx       # 文件夹 + 阈值 sliders
+│   │   ├── Library.tsx        # session list (search/sort/sparkline/tags)
+│   │   ├── SessionDetail.tsx  # 4 chart panels + insights side panel
+│   │   ├── Compare.tsx        # overlay charts + diff table
+│   │   └── Settings.tsx       # folder picker + threshold sliders
 │   ├── components/
-│   │   ├── Charts.tsx         # 4 个 Recharts 面板（synced + brush + reference areas）
-│   │   ├── InsightsPanel.tsx  # 事件列表（点击→图表跳转高亮）
-│   │   ├── OverviewBar.tsx    # 全局历史峰值 + 时段分布
-│   │   └── Sparkline.tsx      # 列表里的微缩 SVG 折线
-│   └── lib/                   # api / types / format / downsample
-├── src-tauri/src/             # Rust 后端
-│   ├── lib.rs                 # 入口 + 命令注册
-│   ├── commands.rs            # Tauri @command（list/get/sparkline/overview/thresholds）
-│   ├── parser.rs              # CSV 解析（UTF-16 BOM + 每行 BOM）
-│   ├── insight.rs             # 阈值驱动的统计 + 事件检测 + 标签推导
-│   ├── importer.rs            # parse → hash → insight → DB
-│   ├── watcher.rs             # 文件夹监视（notify-debouncer-mini）
-│   ├── db.rs                  # SQLite schema + 查询
-│   ├── model.rs               # 数据类型
-│   └── config.rs              # JSON 持久化的设置 + 阈值
-└── docs/
-    ├── design.md              # 原始设计文档
-    └── plan.md                # 实现计划
+│   │   ├── Charts.tsx         # 4 Recharts panels (synced hover, brush, ReferenceArea)
+│   │   ├── InsightsPanel.tsx  # event list (click → scroll + highlight)
+│   │   ├── OverviewBar.tsx    # all-time peaks + hour/weekday histograms
+│   │   └── Sparkline.tsx      # tiny SVG cpu+temp curve per library row
+│   └── lib/                   # typed Tauri commands, formatters, downsampling
+├── src-tauri/src/             # Rust backend
+│   ├── parser.rs              # UTF-16 + per-line BOM CSV decoder
+│   ├── insight.rs             # threshold-driven stats + event runs + tags
+│   ├── importer.rs            # parse → SHA-256 dedupe → insight → DB
+│   ├── watcher.rs             # FSEvents wrapper (notify-debouncer-mini)
+│   ├── db.rs                  # SQLite schema + queries
+│   ├── commands.rs            # Tauri command surface
+│   └── config.rs              # JSON-persisted settings + thresholds
+└── docs/                      # install guide + design + plan
 ```
 
-### 技术栈
+### Architecture
 
-- **Tauri 2** — Rust 后端 + WebView 前端，零依赖原生 macOS 应用
-- **React 19 + Vite + TypeScript** — UI
-- **Recharts** — 时间序列图表
-- **SQLite** (`rusqlite` bundled) — 本地存储
-- **notify-debouncer-mini** — FSEvents 包装
-- **encoding_rs** — UTF-16 BOM 解码
-- **CryptoKit / sha2** — 内容哈希去重
+Rust backend parses iStatistica Pro CSVs into `(Sample, SessionSummary)`, persists to SQLite, exposes Tauri commands (`list_sessions`, `get_samples`, `get_session_sparkline`, `get_overview`, `set_thresholds`, …). React frontend reads via `invoke()`, renders with Recharts. The folder watcher runs in a Rust thread and emits events the frontend listens for.
 
-零第三方服务依赖。
+## Detection thresholds (defaults — all configurable in Settings)
 
-## 阈值默认值（可改）
-
-| 事件 | 触发 | 最短持续 | 合并间隙 |
+| Event | Trigger | Min duration | Merge gap |
 |---|---|---|---|
-| 高 CPU | cpu_util > 80% | 60s | 15s |
-| 高 GPU | gpu_util > 80% | 60s | 15s |
-| 内存压力 | mem_pressure > 80% | 60s | 15s |
-| 过热 | max_temp > 90°C | 30s | 10s |
-| 风扇峰值 | 整段最高 fan RPM | — | 单点 |
+| High CPU | `cpu_util > 80%` | 60s | 15s |
+| High GPU | `gpu_util > 80%` | 60s | 15s |
+| Memory pressure | `mem_pressure > 80%` | 60s | 15s |
+| Overheating | `max_temp > 90°C` | 30s | 10s |
+| Fan peak | global maximum fan RPM | — | single point |
 
-在 Settings → 洞察阈值里调整 + "保存并重新分析" 即可。
+## Why Tauri, not SwiftUI
 
-## 为什么用 Tauri 不用 SwiftUI
-
-最初设计稿是 SwiftUI + SwiftData + Swift Charts。但 SwiftUI 项目的 App Sandbox 配置 / Copy Bundle Resources 这些只能在 Xcode GUI 里点，整个开发链卡在 IDE 上。Tauri 这套全 CLI 可控（`npm create` / `cargo build`），跨平台，图表生态（Recharts）也比 Swift Charts 现成得多。
+The original spec was SwiftUI + SwiftData + Swift Charts. The deal-breaker turned out not to be the language: SwiftUI projects with App Sandbox + bundle resources require a working Xcode GUI for setup. Tauri's whole toolchain is CLI-driven (`npm create`, `cargo build`, `npm run tauri build`), the chart ecosystem (Recharts) is far more mature than Swift Charts, and the resulting `.app` is virtually indistinguishable from a SwiftUI build.
 
 ## License
 
-MIT
+MIT.
 
-## 致谢
+## Acknowledgements
 
-数据源依赖 [iStatistica Pro](https://www.imagetasks.com/system-monitor-mac/index.aspx)。如果觉得这个工具有用，请去给原作者打 5 星。
+Built on [Tauri 2](https://tauri.app), [React](https://react.dev), [Recharts](https://recharts.org), [rusqlite](https://github.com/rusqlite/rusqlite), [notify](https://github.com/notify-rs/notify), [encoding_rs](https://github.com/hsivonen/encoding_rs).
+
+Data source dependency: [iStatistica Pro](https://www.imagetasks.com/system-monitor-mac/index.aspx). If this tool saves you time, go give the original author a 5-star.
