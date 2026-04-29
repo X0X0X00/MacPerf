@@ -60,6 +60,9 @@ pub struct SessionSummary {
     pub seconds_above_temp90: i64,
 
     pub events: Vec<InsightEvent>,
+
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -215,6 +215,15 @@ pub fn delete_session(conn: &Connection, id: i64) -> AppResult<()> {
     Ok(())
 }
 
+pub fn update_summary(conn: &Connection, id: i64, summary: &crate::model::SessionSummary) -> AppResult<()> {
+    let summary_json = serde_json::to_string(summary).unwrap();
+    conn.execute(
+        "UPDATE sessions SET summary_json = ?1 WHERE id = ?2",
+        params![summary_json, id],
+    )?;
+    Ok(())
+}
+
 fn ms_to_utc(ms: i64) -> DateTime<Utc> {
     Utc.timestamp_millis_opt(ms).single().unwrap_or_else(Utc::now)
 }

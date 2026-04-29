@@ -1,5 +1,5 @@
 export interface Sample {
-  timestamp: string; // ISO datetime
+  timestamp: string;
   cpu_util: number;
   mem_pressure: number;
   mem_wired: number;
@@ -48,6 +48,7 @@ export interface SessionSummary {
   seconds_above_mem_pressure80: number;
   seconds_above_temp90: number;
   events: InsightEvent[];
+  tags: string[];
 }
 
 export interface Session {
@@ -62,6 +63,36 @@ export interface Session {
   summary: SessionSummary;
 }
 
+export interface Thresholds {
+  cpu_pct: number;
+  cpu_min_seconds: number;
+  gpu_pct: number;
+  gpu_min_seconds: number;
+  mem_pressure_pct: number;
+  mem_min_seconds: number;
+  temp_celsius: number;
+  temp_min_seconds: number;
+}
+
 export interface AppConfig {
   watched_folder: string | null;
+  thresholds: Thresholds;
+}
+
+export interface PeakRef {
+  value: number;
+  session_id: number;
+  session_label: string;
+  when: string;
+}
+
+export interface Overview {
+  session_count: number;
+  total_duration_seconds: number;
+  total_samples: number;
+  peak_temp: PeakRef | null;
+  peak_cpu: PeakRef | null;
+  peak_fan: PeakRef | null;
+  hour_histogram: number[];
+  weekday_histogram: number[];
 }

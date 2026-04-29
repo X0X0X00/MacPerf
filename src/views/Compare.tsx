@@ -218,34 +218,94 @@ function bucketTimeSeries(pts: [number, number][], target: number): [number, num
 }
 
 function MetricsTable({ sessions }: { sessions: Session[] }) {
-  const cols: { label: string; get: (s: Session) => string }[] = [
+  type Col = {
+    label: string;
+    get: (s: Session) => string;
+    num?: (s: Session) => number;
+    deltaUnit?: (delta: number) => string;
+  };
+  const cols: Col[] = [
     { label: "开始", get: (s) => fmtDateTime(s.start_time) },
-    { label: "时长", get: (s) => fmtDuration(s.duration_seconds) },
-    { label: "Avg CPU", get: (s) => fmtPct(s.summary.cpu_util.avg) },
-    { label: "Peak CPU", get: (s) => fmtPct(s.summary.cpu_util.max) },
-    { label: "CPU >80% 时长", get: (s) => fmtDuration(s.summary.seconds_above_cpu80) },
-    { label: "Avg Temp", get: (s) => fmtTemp(s.summary.max_temp.avg) },
-    { label: "Peak Temp", get: (s) => fmtTemp(s.summary.max_temp.max) },
-    { label: "过热(>90°) 时长", get: (s) => fmtDuration(s.summary.seconds_above_temp90) },
-    { label: "Peak Fan", get: (s) => fmtRPM(s.summary.max_fan_speed.max) },
+    {
+      label: "时长",
+      get: (s) => fmtDuration(s.duration_seconds),
+      num: (s) => s.duration_seconds,
+      deltaUnit: (d) => `${d > 0 ? "+" : ""}${fmtDuration(Math.abs(Math.round(d))).replace(/^/, d < 0 ? "-" : "")}`,
+    },
+    {
+      label: "Avg CPU",
+      get: (s) => fmtPct(s.summary.cpu_util.avg),
+      num: (s) => s.summary.cpu_util.avg,
+      deltaUnit: (d) => `${d > 0 ? "+" : ""}${d.toFixed(1)}%`,
+    },
+    {
+      label: "Peak CPU",
+      get: (s) => fmtPct(s.summary.cpu_util.max),
+      num: (s) => s.summary.cpu_util.max,
+      deltaUnit: (d) => `${d > 0 ? "+" : ""}${d.toFixed(1)}%`,
+    },
+    {
+      label: "CPU >80% 时长",
+      get: (s) => fmtDuration(s.summary.seconds_above_cpu80),
+      num: (s) => s.summary.seconds_above_cpu80,
+      deltaUnit: (d) => `${d > 0 ? "+" : ""}${d}s`,
+    },
+    {
+      label: "Avg Temp",
+      get: (s) => fmtTemp(s.summary.max_temp.avg),
+      num: (s) => s.summary.max_temp.avg,
+      deltaUnit: (d) => `${d > 0 ? "+" : ""}${d.toFixed(1)}°C`,
+    },
+    {
+      label: "Peak Temp",
+      get: (s) => fmtTemp(s.summary.max_temp.max),
+      num: (s) => s.summary.max_temp.max,
+      deltaUnit: (d) => `${d > 0 ? "+" : ""}${d.toFixed(0)}°C`,
+    },
+    {
+      label: "过热(>90°) 时长",
+      get: (s) => fmtDuration(s.summary.seconds_above_temp90),
+      num: (s) => s.summary.seconds_above_temp90,
+      deltaUnit: (d) => `${d > 0 ? "+" : ""}${d}s`,
+    },
+    {
+      label: "Peak Fan",
+      get: (s) => fmtRPM(s.summary.max_fan_speed.max),
+      num: (s) => s.summary.max_fan_speed.max,
+      deltaUnit: (d) => `${d > 0 ? "+" : ""}${Math.round(d).toLocaleString()} RPM`,
+    },
   ];
+
+  // Show diff column only when exactly 2 sessions
+  const showDiff = sessions.length === 2;
+  const a = sessions[0];
+  const b = sessions[1];
 
   return (
     <div className="metrics-table">
       <table>
         <thead>
           <tr>
-            {cols.map((c) => (
-              <th key={c.label}>{c.label}</th>
-            ))}
+            <th>指标</th>
+            {sessions.map((s) => <th key={s.id}>{fmtDateTime(s.start_time)}</th>)}
+            {showDiff && <th>Δ (B − A)</th>}
           </tr>
         </thead>
         <tbody>
-          {sessions.map((s) => (
-            <tr key={s.id}>
-              {cols.map((c) => (
-                <td key={c.label}>{c.get(s)}</td>
-              ))}
+          {cols.slice(1).map((c) => (
+            <tr key={c.label}>
+              <td className="row-label">{c.label}</td>
+              {sessions.map((s) => <td key={s.id}>{c.get(s)}</td>)}
+              {showDiff && c.num && c.deltaUnit && (() => {
+                const delta = c.num(b) - c.num(a);
+                const sign = delta === 0 ? "zero" : delta > 0 ? "pos" : "neg";
+                return (
+                  <td className={`delta delta-${sign}`}>
+                    {c.deltaUnit(delta)}
+                  </td>
+                );
+              })()}
+              {showDiff && !c.num && <td />}
             </tr>
           ))}
         </tbody>

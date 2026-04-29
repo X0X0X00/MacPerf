@@ -1,3 +1,4 @@
+use crate::config::Thresholds;
 use crate::model::{InsightEvent, InsightKind, MetricStats, Sample, SessionSummary};
 use chrono::{DateTime, Utc};
 
@@ -17,7 +18,7 @@ pub fn stats(values: &[f64]) -> MetricStats {
     }
 }
 
-pub fn compute_summary(samples: &[Sample]) -> SessionSummary {
+pub fn compute_summary(samples: &[Sample], t: &Thresholds) -> SessionSummary {
     if samples.is_empty() {
         return SessionSummary::default();
     }
@@ -30,19 +31,35 @@ pub fn compute_summary(samples: &[Sample]) -> SessionSummary {
     let mgt: Vec<f64> = samples.iter().map(|s| s.max_gpu_temp as f64).collect();
     let fan: Vec<f64> = samples.iter().map(|s| s.max_fan_speed as f64).collect();
 
+    let cpu_stats = stats(&cpu);
+    let mp_stats = stats(&mp);
+    let gpu_stats = stats(&gpu);
+    let mt_stats = stats(&mt);
+    let mct_stats = stats(&mct);
+    let mgt_stats = stats(&mgt);
+    let fan_stats = stats(&fan);
+
+    let secs_cpu = seconds_above(samples, |s| s.cpu_util > t.cpu_pct);
+    let secs_gpu = seconds_above(samples, |s| s.gpu_util > t.gpu_pct);
+    let secs_mp = seconds_above(samples, |s| s.mem_pressure > t.mem_pressure_pct);
+    let secs_temp = seconds_above(samples, |s| s.max_temp > t.temp_celsius);
+
+    let tags = derive_tags(&cpu_stats, &gpu_stats, &mt_stats, secs_cpu, secs_gpu, secs_temp);
+
     SessionSummary {
-        cpu_util: stats(&cpu),
-        mem_pressure: stats(&mp),
-        gpu_util: stats(&gpu),
-        max_temp: stats(&mt),
-        max_cpu_temp: stats(&mct),
-        max_gpu_temp: stats(&mgt),
-        max_fan_speed: stats(&fan),
-        seconds_above_cpu80: seconds_above(samples, |s| s.cpu_util > 80.0),
-        seconds_above_gpu80: seconds_above(samples, |s| s.gpu_util > 80.0),
-        seconds_above_mem_pressure80: seconds_above(samples, |s| s.mem_pressure > 80.0),
-        seconds_above_temp90: seconds_above(samples, |s| s.max_temp > 90),
-        events: detect_events(samples),
+        cpu_util: cpu_stats,
+        mem_pressure: mp_stats,
+        gpu_util: gpu_stats,
+        max_temp: mt_stats,
+        max_cpu_temp: mct_stats,
+        max_gpu_temp: mgt_stats,
+        max_fan_speed: fan_stats,
+        seconds_above_cpu80: secs_cpu,
+        seconds_above_gpu80: secs_gpu,
+        seconds_above_mem_pressure80: secs_mp,
+        seconds_above_temp90: secs_temp,
+        events: detect_events(samples, t),
+        tags,
     }
 }
 
@@ -57,45 +74,80 @@ fn seconds_above(samples: &[Sample], pred: impl Fn(&Sample) -> bool) -> i64 {
     total.round() as i64
 }
 
-struct Threshold {
-    kind: InsightKind,
-    test: fn(&Sample) -> Option<f64>,
-    min_duration: f64, // seconds
-    merge_gap: f64,    // seconds
+fn derive_tags(
+    cpu: &MetricStats,
+    gpu: &MetricStats,
+    temp: &MetricStats,
+    secs_cpu: i64,
+    secs_gpu: i64,
+    secs_temp: i64,
+) -> Vec<String> {
+    let mut tags = Vec::new();
+    if cpu.avg < 10.0 && gpu.avg < 5.0 {
+        tags.push("空闲".into());
+    } else {
+        if cpu.avg > 50.0 || secs_cpu > 300 {
+            tags.push("重 CPU".into());
+        }
+        if gpu.avg > 30.0 || secs_gpu > 60 {
+            tags.push("重 GPU".into());
+        }
+        if cpu.p95 < 50.0 && temp.p95 < 80.0 {
+            tags.push("稳定".into());
+        }
+    }
+    if temp.max >= 95.0 || secs_temp > 60 {
+        tags.push("过热".into());
+    }
+    tags
 }
 
-const THRESHOLDS: &[Threshold] = &[
-    Threshold {
-        kind: InsightKind::HighCpu,
-        test: |s| if s.cpu_util > 80.0 { Some(s.cpu_util) } else { None },
-        min_duration: 60.0,
-        merge_gap: 15.0,
-    },
-    Threshold {
-        kind: InsightKind::HighGpu,
-        test: |s| if s.gpu_util > 80.0 { Some(s.gpu_util) } else { None },
-        min_duration: 60.0,
-        merge_gap: 15.0,
-    },
-    Threshold {
-        kind: InsightKind::HighMemPressure,
-        test: |s| if s.mem_pressure > 80.0 { Some(s.mem_pressure) } else { None },
-        min_duration: 60.0,
-        merge_gap: 15.0,
-    },
-    Threshold {
-        kind: InsightKind::HighTemp,
-        test: |s| if s.max_temp > 90 { Some(s.max_temp as f64) } else { None },
-        min_duration: 30.0,
-        merge_gap: 10.0,
-    },
-];
+struct ThresholdSpec {
+    kind: InsightKind,
+    test: Box<dyn Fn(&Sample) -> Option<f64>>,
+    min_duration: f64,
+    merge_gap: f64,
+}
 
-pub fn detect_events(samples: &[Sample]) -> Vec<InsightEvent> {
+fn build_specs(t: &Thresholds) -> Vec<ThresholdSpec> {
+    let cpu_pct = t.cpu_pct;
+    let gpu_pct = t.gpu_pct;
+    let mp_pct = t.mem_pressure_pct;
+    let temp_c = t.temp_celsius;
+    vec![
+        ThresholdSpec {
+            kind: InsightKind::HighCpu,
+            test: Box::new(move |s| if s.cpu_util > cpu_pct { Some(s.cpu_util) } else { None }),
+            min_duration: t.cpu_min_seconds as f64,
+            merge_gap: 15.0,
+        },
+        ThresholdSpec {
+            kind: InsightKind::HighGpu,
+            test: Box::new(move |s| if s.gpu_util > gpu_pct { Some(s.gpu_util) } else { None }),
+            min_duration: t.gpu_min_seconds as f64,
+            merge_gap: 15.0,
+        },
+        ThresholdSpec {
+            kind: InsightKind::HighMemPressure,
+            test: Box::new(move |s| if s.mem_pressure > mp_pct { Some(s.mem_pressure) } else { None }),
+            min_duration: t.mem_min_seconds as f64,
+            merge_gap: 15.0,
+        },
+        ThresholdSpec {
+            kind: InsightKind::HighTemp,
+            test: Box::new(move |s| if s.max_temp > temp_c { Some(s.max_temp as f64) } else { None }),
+            min_duration: t.temp_min_seconds as f64,
+            merge_gap: 10.0,
+        },
+    ]
+}
+
+pub fn detect_events(samples: &[Sample], t: &Thresholds) -> Vec<InsightEvent> {
     let mut events: Vec<InsightEvent> = Vec::new();
 
-    for t in THRESHOLDS {
-        events.extend(detect_runs(samples, t));
+    let specs = build_specs(t);
+    for spec in &specs {
+        events.extend(detect_runs(samples, spec));
     }
 
     if let Some(peak) = samples.iter().max_by_key(|s| s.max_fan_speed) {
@@ -113,7 +165,7 @@ pub fn detect_events(samples: &[Sample]) -> Vec<InsightEvent> {
     events
 }
 
-fn detect_runs(samples: &[Sample], t: &Threshold) -> Vec<InsightEvent> {
+fn detect_runs(samples: &[Sample], t: &ThresholdSpec) -> Vec<InsightEvent> {
     let mut raw: Vec<(DateTime<Utc>, DateTime<Utc>, f64)> = Vec::new();
     let mut cur: Option<(DateTime<Utc>, DateTime<Utc>, f64)> = None;
 
@@ -192,17 +244,29 @@ mod tests {
 
     #[test]
     fn detect_high_cpu_run() {
+        let t = Thresholds::default();
         let samples: Vec<Sample> = (0..=120).map(|i| make_sample(i, 90.0)).collect();
-        let events = detect_events(&samples);
+        let events = detect_events(&samples, &t);
         let high_cpu: Vec<_> = events.iter().filter(|e| e.kind == InsightKind::HighCpu).collect();
         assert_eq!(high_cpu.len(), 1);
     }
 
     #[test]
     fn ignore_short_runs() {
+        let t = Thresholds::default();
         let samples: Vec<Sample> = (0..=30).map(|i| make_sample(i, 90.0)).collect();
-        let events = detect_events(&samples);
+        let events = detect_events(&samples, &t);
         let high_cpu: Vec<_> = events.iter().filter(|e| e.kind == InsightKind::HighCpu).collect();
         assert!(high_cpu.is_empty());
+    }
+
+    #[test]
+    fn custom_threshold_lowers_bar() {
+        let mut t = Thresholds::default();
+        t.cpu_pct = 50.0;
+        t.cpu_min_seconds = 10;
+        let samples: Vec<Sample> = (0..=20).map(|i| make_sample(i, 60.0)).collect();
+        let events = detect_events(&samples, &t);
+        assert_eq!(events.iter().filter(|e| e.kind == InsightKind::HighCpu).count(), 1);
     }
 }

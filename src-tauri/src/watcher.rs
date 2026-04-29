@@ -1,3 +1,4 @@
+use crate::config::Thresholds;
 use crate::error::AppResult;
 use crate::importer;
 use notify_debouncer_mini::{new_debouncer, notify::RecursiveMode, DebouncedEvent, Debouncer};
@@ -12,6 +13,7 @@ use tauri::{AppHandle, Emitter};
 
 pub struct WatcherHandle {
     _debouncer: Debouncer<notify::RecommendedWatcher>,
+    #[allow(dead_code)]
     pub path: PathBuf,
 }
 
@@ -19,6 +21,7 @@ pub fn start(
     folder: &Path,
     db: Arc<Mutex<Connection>>,
     app: AppHandle,
+    thresholds: Thresholds,
 ) -> AppResult<WatcherHandle> {
     let (tx, rx) = mpsc::channel::<Result<Vec<DebouncedEvent>, notify::Error>>();
 
@@ -34,6 +37,7 @@ pub fn start(
 
     let app_for_events = app.clone();
     let db_for_events = db.clone();
+    let thr_for_events = thresholds.clone();
     thread::spawn(move || {
         for res in rx {
             let Ok(events) = res else { continue };
@@ -45,8 +49,14 @@ pub fn start(
                 if !path.exists() {
                     continue;
                 }
+                let name = path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("(file)")
+                    .to_string();
+                let _ = app_for_events.emit("import-started", &name);
                 let mut conn = db_for_events.lock();
-                match importer::import_file(&mut conn, &path) {
+                match importer::import_file(&mut conn, &path, &thr_for_events) {
                     Ok(id) => {
                         let _ = app_for_events.emit("session-imported", id);
                     }
@@ -61,17 +71,23 @@ pub fn start(
         }
     });
 
-    // Trigger an initial scan for any files already present (and not yet imported)
     let app2 = app.clone();
     let db2 = db.clone();
     let folder_owned2 = folder.to_path_buf();
+    let thr2 = thresholds.clone();
     thread::spawn(move || {
         if let Ok(entries) = std::fs::read_dir(&folder_owned2) {
             for entry in entries.flatten() {
                 let p = entry.path();
                 if is_csv(&p) {
+                    let name = p
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("(file)")
+                        .to_string();
+                    let _ = app2.emit("import-started", &name);
                     let mut conn = db2.lock();
-                    match importer::import_file(&mut conn, &p) {
+                    match importer::import_file(&mut conn, &p, &thr2) {
                         Ok(id) => {
                             let _ = app2.emit("session-imported", id);
                         }

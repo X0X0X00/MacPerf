@@ -8,6 +8,7 @@ use std::sync::Arc;
 pub struct AppState {
     pub db: Arc<Mutex<Connection>>,
     pub watcher: Mutex<Option<WatcherHandle>>,
+    #[allow(dead_code)]
     pub db_path: PathBuf,
     pub config_path: PathBuf,
 }

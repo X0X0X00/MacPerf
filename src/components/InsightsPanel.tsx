@@ -1,5 +1,6 @@
 import { InsightEvent, InsightKind } from "../lib/types";
 import { fmtDuration, fmtTime } from "../lib/format";
+import { eventKey } from "./Charts";
 
 const META: Record<InsightKind, { emoji: string; label: string; unit: (v: number) => string }> = {
   highCpu: { emoji: "🔥", label: "CPU 持续过高", unit: (v) => `peak ${Math.round(v)}%` },
@@ -11,9 +12,11 @@ const META: Record<InsightKind, { emoji: string; label: string; unit: (v: number
 
 interface Props {
   events: InsightEvent[];
+  focusedEventId?: string | null;
+  onSelect?: (e: InsightEvent) => void;
 }
 
-export function InsightsPanel({ events }: Props) {
+export function InsightsPanel({ events, focusedEventId, onSelect }: Props) {
   if (events.length === 0) {
     return (
       <div className="insights">
@@ -26,14 +29,20 @@ export function InsightsPanel({ events }: Props) {
     <div className="insights">
       <h3>洞察 ({events.length})</h3>
       <div className="insights-list">
-        {events.map((e, i) => {
+        {events.map((e) => {
           const meta = META[e.kind];
           const start = fmtTime(e.start_time);
           const end = fmtTime(e.end_time);
           const dur = (new Date(e.end_time).getTime() - new Date(e.start_time).getTime()) / 1000;
           const isPoint = e.kind === "fanPeak";
+          const id = eventKey(e);
+          const focused = focusedEventId === id;
           return (
-            <div key={i} className="insight-item">
+            <button
+              key={id}
+              className={`insight-item ${focused ? "focused" : ""}`}
+              onClick={() => onSelect?.(e)}
+            >
               <div className="insight-emoji">{meta.emoji}</div>
               <div className="insight-body">
                 <div className="insight-label">{meta.label}</div>
@@ -42,7 +51,7 @@ export function InsightsPanel({ events }: Props) {
                 </div>
                 <div className="insight-peak">{meta.unit(e.peak_value)}</div>
               </div>
-            </div>
+            </button>
           );
         })}
       </div>

@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AppConfig, Sample, Session } from "./types";
+import type { AppConfig, Overview, Sample, Session, Thresholds } from "./types";
 
 export async function listSessions(): Promise<Session[]> {
   return invoke<Session[]>("list_sessions");
@@ -27,4 +27,19 @@ export async function setWatchedFolder(folder: string): Promise<AppConfig> {
 
 export async function rescan(): Promise<void> {
   return invoke<void>("rescan");
+}
+
+export async function getThresholds(): Promise<Thresholds> {
+  return invoke<Thresholds>("get_thresholds");
+}
+
+export async function setThresholds(
+  thresholds: Thresholds,
+  reanalyze: boolean
+): Promise<void> {
+  return invoke<void>("set_thresholds", { thresholds, reanalyze });
+}
+
+export async function getOverview(): Promise<Overview> {
+  return invoke<Overview>("get_overview");
 }

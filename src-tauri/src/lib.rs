@@ -34,7 +34,7 @@ pub fn run() {
             if let Some(folder) = cfg.watched_folder.clone() {
                 if folder.exists() {
                     let handle_app = app.handle().clone();
-                    if let Ok(h) = watcher::start(&folder, state.db.clone(), handle_app) {
+                    if let Ok(h) = watcher::start(&folder, state.db.clone(), handle_app, cfg.thresholds.clone()) {
                         *state.watcher.lock() = Some(h);
                     }
                 }
@@ -47,10 +47,14 @@ pub fn run() {
             commands::list_sessions,
             commands::get_session,
             commands::get_samples,
+            commands::get_session_sparkline,
             commands::delete_session,
             commands::get_config,
             commands::set_watched_folder,
             commands::rescan,
+            commands::get_thresholds,
+            commands::set_thresholds,
+            commands::get_overview,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
