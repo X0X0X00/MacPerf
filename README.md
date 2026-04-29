@@ -1,90 +1,118 @@
+<div align="center">
+
+<img src="src-tauri/icons/128x128@2x.png" alt="MacPerf" width="120" height="120"/>
+
 # MacPerf
 
-iStatistica Pro CSV 性能分析器 —— 监视一个文件夹，自动导入 iStatistica Pro 导出的 CSV，按时间序列可视化 + 自动检测异常事件 + 多记录对比。
+**让 iStatistica Pro 的 CSV 真正能看。**
 
-## 快速开始
+监视一个文件夹 → 自动入库 → 时间序列可视化 + 阈值事件检测 + 跨记录对比。
 
-```sh
-cd "mac status/macperf"
-npm install                # 装前端依赖（首次约 30s）
-npm run tauri dev          # 起开发模式（首次 Rust 编译约 1-2 min）
-```
+100% 本地，零网络请求。
 
-第一次启动时会让你选 iStatistica Pro 的 CSV 导出文件夹（设置里也能改）。
-路径会持久化保存到 macOS 的 app data 目录。
+</div>
 
-打包发布版：
+---
 
-```sh
-npm run tauri build        # 产出 .dmg / .app 在 src-tauri/target/release/bundle/
-```
+## 它是干什么的
+
+iStatistica Pro 能把系统状态导出成 CSV，但拿到一份几兆的 UTF-16 表格你也读不出什么东西来。
+
+MacPerf 把这堆 CSV 变成你真正会看的东西 —— 顺带回答你心里真正在想的问题：*这台 Mac 啥时候过热的？哪段时间 CPU 一直跑满？昨天 vs 今天哪个更费电？*
 
 ## 功能
 
-- **自动监视** — `notify` crate 监视配置的文件夹，新 CSV 落盘即自动入库
-- **去重** — 按 SHA-256 内容哈希，重复文件不会重复导入
-- **4 个图表面板** — CPU、内存、GPU、温度 & 风扇
-- **自动洞察** — 检测持续高 CPU/GPU/内存压力（>80%, 60s）、过热（>90°C, 30s）、风扇峰值
-- **跨记录对比** — 多选 2–6 条记录，叠加图按经过时间对齐 + 指标对比表
+- **🪂 自动监视** — 设置一个文件夹，iStatistica Pro 一导出新 CSV 就自动入库（FSEvents + `notify` crate）
+- **📊 4 个图表面板** — CPU / 内存 / GPU / 温度&风扇，时间轴同步、hover 游标联动
+- **🔍 自动洞察** — 持续高 CPU/GPU/内存压力、过热区间、风扇峰值，全部自动检测
+- **🎯 配置阈值** — 80% 太宽？改成 70% 持续 30 秒，一键重新分析所有历史记录
+- **🆚 跨记录对比** — 多选 2–6 条，叠加图按经过时间对齐 + 指标差值表（A vs B）
+- **🏷 自动标签** — "重 CPU"、"过热"、"空闲"，扫一眼记录列表就知道每条记录大概是什么
+- **📈 全局摘要** — 历史峰值温度/CPU/风扇（点一下跳到对应记录）+ 时段分布直方图
+- **⚡ 迷你 sparkline** — Library 列表里每条记录右边一条微缩 CPU+温度曲线
+- **🔒 隐私优先** — 所有处理都在本地，不发任何网络请求
 
-## 数据流
+## 快速开始
 
+### 安装
+
+从 [Releases](https://github.com/X0X0X00/MacPerf/releases) 下载最新的 `MacPerf_*.dmg`，把 MacPerf 拖到 Applications。
+
+**首次启动**：app 没签名，右键 `MacPerf.app` → **打开** → 在系统弹窗里再确认一次。之后正常双击即可。
+
+### 配置
+
+1. 在 iStatistica Pro 的 Preferences → Logger 里把 CSV export 指向某个文件夹（比如 `~/Documents/iStatistica/`）
+2. 打开 MacPerf，点右上角 ⚙️ → 选同一个文件夹
+3. 完事，已有 CSV 会立即扫描入库，新 CSV 落盘后会自动检测
+
+## 键盘快捷键
+
+| 快捷键 | 操作 |
+|---|---|
+| ⌘, | 打开/关闭设置 |
+| ⌘F | 聚焦搜索框 |
+| ⌘K | 折叠/展开顶部摘要栏 |
+| ⌘+点击 | 多选记录（选 2 条进对比模式） |
+| 右键单击 | 删除该条记录 |
+
+## 开发
+
+需要 Rust stable + Node 20+ + Xcode CLT（macOS）。
+
+```sh
+git clone git@github.com:X0X0X00/MacPerf.git
+cd MacPerf
+npm install
+npm run tauri dev      # 开发模式（热重载）
+npm run tauri build    # 打 release，产物在 src-tauri/target/release/bundle/
 ```
-CSV 文件 → notify 监视 → CSVImporter (UTF-16 解码 + 13 列校验)
-                            ↓
-                       SHA-256 去重
-                            ↓
-                  InsightEngine (统计 + 事件检测)
-                            ↓
-                   SQLite (sessions + samples)
-                            ↓
-                      Tauri command
-                            ↓
-                  React + Recharts 渲染
-```
 
-## 项目结构
+### 项目结构
 
 ```
 macperf/
 ├── src/                       # React 前端
-│   ├── App.tsx                # 主布局（top bar + sidebar + content）
+│   ├── App.tsx                # 主布局 + 顶栏 + 摘要 + 快捷键
 │   ├── views/
-│   │   ├── Library.tsx        # 记录列表（多选）
-│   │   ├── SessionDetail.tsx  # 单条记录详情（4 chart + insights）
-│   │   ├── Compare.tsx        # 多条对比（叠加图 + 表格）
-│   │   └── Settings.tsx       # 设置模态框
+│   │   ├── Library.tsx        # 记录列表（搜索/排序/sparkline/标签）
+│   │   ├── SessionDetail.tsx  # 单条详情（4 chart + insights）
+│   │   ├── Compare.tsx        # 多条对比（叠加图 + diff 表）
+│   │   └── Settings.tsx       # 文件夹 + 阈值 sliders
 │   ├── components/
-│   │   ├── Charts.tsx         # 4 个 Recharts 面板
-│   │   └── InsightsPanel.tsx
+│   │   ├── Charts.tsx         # 4 个 Recharts 面板（synced + brush + reference areas）
+│   │   ├── InsightsPanel.tsx  # 事件列表（点击→图表跳转高亮）
+│   │   ├── OverviewBar.tsx    # 全局历史峰值 + 时段分布
+│   │   └── Sparkline.tsx      # 列表里的微缩 SVG 折线
 │   └── lib/                   # api / types / format / downsample
 ├── src-tauri/src/             # Rust 后端
 │   ├── lib.rs                 # 入口 + 命令注册
-│   ├── commands.rs            # Tauri @command
-│   ├── parser.rs              # CSV 解析（UTF-16 BOM）
-│   ├── insight.rs             # stats + event detection
+│   ├── commands.rs            # Tauri @command（list/get/sparkline/overview/thresholds）
+│   ├── parser.rs              # CSV 解析（UTF-16 BOM + 每行 BOM）
+│   ├── insight.rs             # 阈值驱动的统计 + 事件检测 + 标签推导
 │   ├── importer.rs            # parse → hash → insight → DB
-│   ├── watcher.rs             # FSEvents 包装（notify-debouncer-mini）
+│   ├── watcher.rs             # 文件夹监视（notify-debouncer-mini）
 │   ├── db.rs                  # SQLite schema + 查询
 │   ├── model.rs               # 数据类型
-│   └── config.rs              # JSON 持久化的设置
-└── docs/superpowers/          # 设计文档 + 实现计划（在仓库根的 mac status/）
+│   └── config.rs              # JSON 持久化的设置 + 阈值
+└── docs/
+    ├── design.md              # 原始设计文档
+    └── plan.md                # 实现计划
 ```
 
-## 测试
+### 技术栈
 
-```sh
-cd src-tauri && cargo test --lib    # 6 个 Rust 单元测试
-```
+- **Tauri 2** — Rust 后端 + WebView 前端，零依赖原生 macOS 应用
+- **React 19 + Vite + TypeScript** — UI
+- **Recharts** — 时间序列图表
+- **SQLite** (`rusqlite` bundled) — 本地存储
+- **notify-debouncer-mini** — FSEvents 包装
+- **encoding_rs** — UTF-16 BOM 解码
+- **CryptoKit / sha2** — 内容哈希去重
 
-覆盖：
-- UTF-16 LE BOM 解码
-- 真实 CSV 行解析
-- 时间戳解析（带时区）
-- 统计计算
-- 高 CPU 事件检测（含最短持续时长筛选）
+零第三方服务依赖。
 
-## 阈值
+## 阈值默认值（可改）
 
 | 事件 | 触发 | 最短持续 | 合并间隙 |
 |---|---|---|---|
@@ -94,4 +122,16 @@ cd src-tauri && cargo test --lib    # 6 个 Rust 单元测试
 | 过热 | max_temp > 90°C | 30s | 10s |
 | 风扇峰值 | 整段最高 fan RPM | — | 单点 |
 
-阈值目前是硬编码（`src-tauri/src/insight.rs::THRESHOLDS`），可以改后重新编译。
+在 Settings → 洞察阈值里调整 + "保存并重新分析" 即可。
+
+## 为什么用 Tauri 不用 SwiftUI
+
+最初设计稿是 SwiftUI + SwiftData + Swift Charts。但 SwiftUI 项目的 App Sandbox 配置 / Copy Bundle Resources 这些只能在 Xcode GUI 里点，整个开发链卡在 IDE 上。Tauri 这套全 CLI 可控（`npm create` / `cargo build`），跨平台，图表生态（Recharts）也比 Swift Charts 现成得多。
+
+## License
+
+MIT
+
+## 致谢
+
+数据源依赖 [iStatistica Pro](https://www.imagetasks.com/system-monitor-mac/index.aspx)。如果觉得这个工具有用，请去给原作者打 5 星。
