@@ -1,0 +1,70 @@
+name: Release
+
+# Triggered by pushing a tag like v0.1.0 / v0.2.3 / v1.0.0-beta.1
+# Builds .dmg + .app, creates a draft GitHub Release, attaches the artefacts.
+# Manually `workflow_dispatch` to test the build without publishing.
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-14         # Apple Silicon runner
+            target: aarch64-apple-darwin
+            arch: aarch64
+          # Add Intel later if you want a universal build:
+          # - platform: macos-13       # Intel runner
+          #   target: x86_64-apple-darwin
+          #   arch: x64
+
+    runs-on: ${{ matrix.platform }}
+
+    permissions:
+      contents: write     # needed to create the release + upload assets
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install npm deps
+        run: npm ci
+
+      - name: Build + bundle + publish
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: '${{ github.ref_name }}'
+          releaseBody: |
+            ## MacPerf ${{ github.ref_name }}
+
+            See [README](https://github.com/${{ github.repository }}#readme) for what's new and how to install.
+
+            **macOS Apple Silicon**: download `MacPerf_*_aarch64.dmg` below → drag to Applications → first launch right-click → Open.
+          releaseDraft: true        # publish manually after eyeballing
+          prerelease: false
+          args: --target ${{ matrix.target }}
